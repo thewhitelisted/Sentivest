@@ -4,6 +4,9 @@ import yfinance as yf
 from GoogleNews import GoogleNews
 from newspaper import Article
 import datetime
+from pypfopt.expected_returns import mean_historical_return
+from pypfopt.risk_models import CovarianceShrinkage
+from pypfopt.efficient_frontier import EfficientFrontier
 
 SOURCE_WEIGHTS = {
     "bloomberg.com": 1.0,
@@ -49,8 +52,6 @@ def extract_article(url):
 def get_full_news_articles(ticker, num_articles=5):
     news_results = get_news(ticker)
     articles = []
-
-    print(len(news_results))
     
     for article in news_results[:num_articles]:
         text = extract_article(article["link"])
@@ -108,7 +109,26 @@ def aggregate_sentiment(stock_articles):
     return final_score
 
 
-news_articles = get_full_news_articles("MSFT")
-scores = aggregate_sentiment(news_articles)
-for score in scores:
-    print(f"{score}: {scores[score]}")
+# Define tickers (example stocks)
+tickers = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"]
+
+# Download historical adjusted closing prices (1 year)
+data = yf.download(tickers, period="1y").get("Adj Close", yf.download(tickers, period="1y").get("Close"))
+
+# Compute expected annualized returns
+mu = mean_historical_return(data)
+
+# Compute shrinkage covariance matrix (Ledoit-Wolf)
+S = CovarianceShrinkage(data).ledoit_wolf()
+
+ef = EfficientFrontier(mu, S)
+weights = ef.max_sharpe()  # Maximize Sharpe ratio
+cleaned_weights = ef.clean_weights()  # Clean small weights
+print(cleaned_weights)  # Shows stock allocations
+print(ef.portfolio_performance(verbose=True));
+
+ef = EfficientFrontier(mu, S)
+weights_low_risk = ef.min_volatility()  # Low-risk allocation
+cleaned_weights = ef.clean_weights()
+print(cleaned_weights)
+print(ef.portfolio_performance(verbose=True));
