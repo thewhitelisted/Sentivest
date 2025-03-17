@@ -7,6 +7,9 @@ import datetime
 from pypfopt.expected_returns import mean_historical_return
 from pypfopt.risk_models import CovarianceShrinkage
 from pypfopt.efficient_frontier import EfficientFrontier
+from pypfopt.black_litterman import BlackLittermanModel
+from pypfopt.black_litterman import market_implied_prior_returns
+import pandas as pd
 
 SOURCE_WEIGHTS = {
     "bloomberg.com": 1.0,
@@ -29,7 +32,7 @@ def get_sentiment(text):
     probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
     return {"positive": probs[0][0].item(), "neutral": probs[0][1].item(), "negative": probs[0][2].item()}
 
-def get_news(ticker, num_pages=3):
+def get_news(ticker, num_pages=1):
     googlenews = GoogleNews(lang='en', region='US')
     googlenews.search(ticker)
     
@@ -106,11 +109,53 @@ def aggregate_sentiment(stock_articles):
         for key in final_score:
             final_score[key] /= total_weight
 
+    # if all sentiment values are 0, set default to 0.33 for each
+    if sum(final_score.values()) == 0:
+        final_score["positive"] = 0.33
+        final_score["neutral"] = 0.33
+        final_score["negative"] = 0.33
+    
     return final_score
 
+def compute_sentiment_score(sentiment):
+    """Convert FinBERT sentiment output into a single score."""
+    return sentiment["positive"] - sentiment["negative"]
+
+def sentiment_to_return(sentiment_score, max_return=0.03, min_return=-0.02):
+    """Convert sentiment score to expected excess return for BLM."""
+    if sentiment_score > 0.5:
+        return max_return  # Strongly positive sentiment → +3% expected return
+    elif sentiment_score > 0.2:
+        return 0.02  # Moderate positive sentiment → +2%
+    elif sentiment_score < -0.5:
+        return min_return  # Strongly negative sentiment → -2%
+    elif sentiment_score < -0.2:
+        return -0.01  # Moderate negative sentiment → -1%
+    else:
+        return 0  # Neutral sentiment → No adjustment
+    
+def generate_views(stock_sentiments):
+    """Convert sentiment scores into Black-Litterman investor views."""
+    views = {}
+    for stock, sentiment in stock_sentiments.items():
+        score = compute_sentiment_score(sentiment)
+        expected_return = sentiment_to_return(score)
+        if expected_return != 0:  # Ignore neutral views
+            views[stock] = expected_return
+    return views
+
+def get_market_caps(tickers):
+    """Fetches the market capitalization for a list of stock tickers."""
+    market_caps = {}
+    
+    for ticker in tickers:
+        stock = yf.Ticker(ticker)
+        market_caps[ticker] = stock.info.get("marketCap", 0)  # Fetch market cap, default to 0 if missing
+    
+    return market_caps
 
 # Define tickers (example stocks)
-tickers = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"]
+tickers = ["MSFT", "AAPL", "GOOG", "AMZN", "TSLA"]
 
 # Download historical adjusted closing prices (1 year)
 data = yf.download(tickers, period="1y").get("Adj Close", yf.download(tickers, period="1y").get("Close"))
@@ -127,8 +172,31 @@ cleaned_weights = ef.clean_weights()  # Clean small weights
 print(cleaned_weights)  # Shows stock allocations
 print(ef.portfolio_performance(verbose=True));
 
-ef = EfficientFrontier(mu, S)
-weights_low_risk = ef.min_volatility()  # Low-risk allocation
-cleaned_weights = ef.clean_weights()
+ff = EfficientFrontier(mu, S)
+weights_low_risk = ff.min_volatility()  # Low-risk allocation
+cleaned_weights = ff.clean_weights()
 print(cleaned_weights)
-print(ef.portfolio_performance(verbose=True));
+print(ff.portfolio_performance(verbose=True));
+
+# Get news articles for each stock
+stock_views = dict()
+for ticker in tickers:
+    stock_articles = get_full_news_articles(ticker, num_articles=5)
+    sentiment = aggregate_sentiment(stock_articles)
+    stock_views[ticker] = sentiment
+    print(f"Sentiment for {ticker}: {sentiment}")
+
+investor_views = generate_views(stock_views)
+
+# Recompute the covariance matrix to ensure it's in the correct format
+market_caps = get_market_caps(tickers)
+risk_aversion = 2.5  # Example risk aversion coefficient
+prior = market_implied_prior_returns(market_caps, risk_aversion, S)
+bl = BlackLittermanModel(S, pi=prior, absolute_views=investor_views)
+posterior_returns = bl.bl_returns()
+
+ef_bl = EfficientFrontier(posterior_returns, S)
+weights_bl = ef_bl.max_sharpe()
+cleaned_weights = ef_bl.clean_weights()
+print(cleaned_weights)
+print(ef_bl.portfolio_performance(verbose=True))
