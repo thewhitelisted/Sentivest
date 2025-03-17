@@ -135,7 +135,6 @@ def sentiment_to_return(sentiment_score, max_return=0.03, min_return=-0.02):
         return 0  # Neutral sentiment → No adjustment
     
 def generate_views(stock_sentiments):
-    """Convert sentiment scores into Black-Litterman investor views."""
     views = {}
     for stock, sentiment in stock_sentiments.items():
         score = compute_sentiment_score(sentiment)
@@ -145,7 +144,6 @@ def generate_views(stock_sentiments):
     return views
 
 def get_market_caps(tickers):
-    """Fetches the market capitalization for a list of stock tickers."""
     market_caps = {}
     
     for ticker in tickers:
@@ -188,7 +186,6 @@ for ticker in tickers:
 
 investor_views = generate_views(stock_views)
 
-# Recompute the covariance matrix to ensure it's in the correct format
 market_caps = get_market_caps(tickers)
 risk_aversion = 2.5  # Example risk aversion coefficient
 prior = market_implied_prior_returns(market_caps, risk_aversion, S)
