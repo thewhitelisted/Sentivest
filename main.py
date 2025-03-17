@@ -3,6 +3,18 @@ import torch
 import yfinance as yf
 from GoogleNews import GoogleNews
 from newspaper import Article
+import datetime
+
+SOURCE_WEIGHTS = {
+    "bloomberg.com": 1.0,
+    "cnbc.com": 0.9,
+    "reuters.com": 0.9,
+    "marketwatch.com": 0.8,
+    "forbes.com": 0.7,
+    "twitter.com": 0.5,
+    "reddit.com": 0.4,
+    "seekingalpha.com": 0.6
+}
 
 model_name = "yiyanghkust/finbert-tone"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -53,7 +65,50 @@ def analyze_sentiment(articles):
         scores.append(sentiment)
     return scores
 
+
+def recency_weight(article_date):
+    days_old = (datetime.datetime.now() - article_date).days
+    return max(0.5, 1 - (days_old / 30))  # Min weight of 0.5 for articles older than 30 days
+
+def weighted_sentiment(article, sentiment):
+    source = article.get("source", "").lower()
+    source_wt = SOURCE_WEIGHTS.get(source, 0.5)  # Default to 0.5 if unknown source
+    recency_wt = recency_weight(article["date"]) if "date" in article else 0.5  # Default recency weight if date is missing
+
+    weight = source_wt * recency_wt
+    
+    return {
+        "positive": sentiment["positive"] * weight,
+        "neutral": sentiment["neutral"] * weight,
+        "negative": sentiment["negative"] * weight
+    }
+
+def aggregate_sentiment(stock_articles):
+    total_weight = 0
+    final_score = {"positive": 0, "neutral": 0, "negative": 0}
+
+    for article in stock_articles:
+        if article["text"]:
+            sentiment = get_sentiment(article["text"])  # FinBERT Sentiment
+        else:
+            sentiment = get_sentiment(article["title"])  # Use title if text is not available
+        weighted_score = weighted_sentiment(article, sentiment)
+        
+        weight = sum(weighted_score.values())  # Total weight
+        total_weight += weight
+        
+        for key in final_score:
+            final_score[key] += weighted_score[key]
+
+    # Normalize by total weight
+    if total_weight > 0:
+        for key in final_score:
+            final_score[key] /= total_weight
+
+    return final_score
+
+
 news_articles = get_full_news_articles("MSFT")
-sentiment_results = analyze_sentiment(news_articles)
-for s in sentiment_results:
-    print(s)
+scores = aggregate_sentiment(news_articles)
+for score in scores:
+    print(f"{score}: {scores[score]}")
