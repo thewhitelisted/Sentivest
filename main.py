@@ -193,7 +193,7 @@ bl = BlackLittermanModel(S, pi=prior, absolute_views=investor_views)
 posterior_returns = bl.bl_returns()
 
 ef_bl = EfficientFrontier(posterior_returns, S)
-weights_bl = ef_bl.max_sharpe()
+weights_bl = ef_bl.min_volatility()
 cleaned_weights = ef_bl.clean_weights()
 print(cleaned_weights)
 print(ef_bl.portfolio_performance(verbose=True))
