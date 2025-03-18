@@ -8,6 +8,8 @@ Sentiment-Driven Portfolio Adjustments: The tool integrates sentiment analysis u
 
 The tool combines Modern Portfolio Theory with the Black-Litterman model to optimize stock allocations. The Black-Litterman model refines MPT by incorporating subjective market views, ensuring a balanced, risk-averse portfolio. It recommends optimal stock holdings, reallocation strategies, and suggests diversification options to maximize returns while minimizing volatility.
 
+NOTE: sentiment analysis for company data only works for tickers that reflect actual companies.
+
 ## TODOs
 - [ ] Implement sentiment analysis module
 - [ ] Develop Black-Litterman model integration

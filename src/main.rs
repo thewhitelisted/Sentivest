@@ -191,7 +191,7 @@ fn analyze_stock_data(history: &yahoo::YResponse) -> Result<String, Box<dyn Erro
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let tickers = vec!["AAPL", "GOOGL", "MSFT"];
+    let tickers = vec!["TSLA", "GOOGL", "MSFT"];
 
     for ticker in &tickers {
         println!("\n=== Processing {} ===", ticker);
