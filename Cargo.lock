@@ -970,20 +970,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "optimizer"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "reqwest",
- "scraper",
- "serde",
- "serde_json",
- "time",
- "tokio",
- "yahoo_finance_api",
-]
-
-[[package]]
 name = "parking_lot"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1467,6 +1453,20 @@ dependencies = [
  "precomputed-hash",
  "servo_arc",
  "smallvec",
+]
+
+[[package]]
+name = "sentivest"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "reqwest",
+ "scraper",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "yahoo_finance_api",
 ]
 
 [[package]]

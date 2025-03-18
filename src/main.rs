@@ -70,7 +70,6 @@ async fn scrape_filing(url: &str) -> Result<String, Box<dyn Error>> {
     Ok(extracted_text)
 }
 
-
 /// Fetches the CIK for a given ticker symbol from a local JSON file
 fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     // Read the embedded JSON file
