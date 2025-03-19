@@ -200,57 +200,6 @@ async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Erro
     Ok(response)
 }
 
-fn analyze_stock_data(history: &yahoo::YResponse) -> Result<String, Box<dyn Error>> {
-    let quotes = history.quotes()?;
-    
-    if quotes.is_empty() {
-        return Ok("No historical data available for analysis".to_string());
-    }
-    
-    // Calculate some basic metrics
-    let latest_close = quotes.last().unwrap().close;
-    let earliest_close = quotes.first().unwrap().close;
-    let percent_change = (latest_close - earliest_close) / earliest_close * 100.0;
-    
-    // Find highest and lowest prices
-    let mut highest = quotes[0].high;
-    let mut lowest = quotes[0].low;
-    let mut total_volume = 0;
-    
-    for quote in quotes.iter() {
-        if quote.high > highest {
-            highest = quote.high;
-        }
-        if quote.low < lowest {
-            lowest = quote.low;
-        }
-        total_volume += quote.volume;
-    }
-    
-    // Average volume
-    let avg_volume = total_volume as f64 / quotes.len() as f64;
-    
-    // Format the analysis
-    let analysis = format!(
-        "Analysis over {} days:\n\
-         - Starting price: ${:.2}\n\
-         - Latest price: ${:.2}\n\
-         - Change: {:.2}%\n\
-         - Highest price: ${:.2}\n\
-         - Lowest price: ${:.2}\n\
-         - Average daily volume: {:.0}",
-        quotes.len(),
-        earliest_close,
-        latest_close,
-        percent_change,
-        highest,
-        lowest,
-        avg_volume
-    );
-    
-    Ok(analysis)
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // todo: add impl for user portfolios
