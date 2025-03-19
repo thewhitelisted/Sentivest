@@ -111,7 +111,7 @@ async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Erro
     Ok(response)
 }
 
-pub fn parse_json(json: &serde_json::Value) -> Vec<f64> {
+pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
     // extract revenue data from past 5 years to calculate growth rate
     let mut last_year = 0.0;
     let mut second_last_year = 0.0;
@@ -130,15 +130,30 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<f64> {
         // reports come in chronological order, get the last two indices
         let mut reports = yearly_reports.collect::<Vec<_>>();
         reports.reverse();
-        println!("Reports: {:?}", reports);
-        if reports.len() >= 2 {
-            last_year = reports[0].get("val").unwrap().as_f64().unwrap();
-            second_last_year = reports[1].get("val").unwrap().as_f64().unwrap();
+        if reports.len() >= 2{
+            // date should be later than 2021
+            if let Some(date) = reports[0].get("end") {
+                if let Some(year) = date.as_str().unwrap().split("-").collect::<Vec<_>>().get(0) {
+                    if year.parse::<i32>().unwrap() < 2022 {
+                        println!("Not enough data to calculate growth rate");
+                    } else {
+                        last_year = reports[0].get("val").unwrap().as_f64().unwrap();
+                        second_last_year = reports[1].get("val").unwrap().as_f64().unwrap();
+                    }
+                }
+            }
         } else {
             println!("Not enough data to calculate growth rate");
         }
     }
-    let growth_rate = ((last_year - second_last_year) / second_last_year) * 100.0;
+    
+    let mut growth_rate = None;
+    if last_year == 0.0 || second_last_year == 0.0 {
+        growth_rate = None;
+    } else {
+        growth_rate = Some(((last_year - second_last_year) / second_last_year) * 100.0);
+    }
+    
     
     revenue_data.push(growth_rate);
     revenue_data
