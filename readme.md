@@ -15,5 +15,6 @@ NOTE: sentiment analysis for company data only works for tickers that reflect ac
 - [ ] Develop Black-Litterman model integration
 - [ ] Create portfolio optimization algorithm
 - [ ] Design user interface for portfolio management
+- [ ] Add database of stock data and cashe information that already is loaded
 - [ ] Perform end-to-end testing
 - [ ] Prepare documentation and user guide
