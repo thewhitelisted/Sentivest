@@ -5,8 +5,6 @@ use std::error::Error;
 use time::OffsetDateTime;
 use yahoo_finance_api as yahoo;
 
-mod parser;
-
 /// Fetch SEC filings for a given CIK and form type
 /// 
 /// Example URL: 
@@ -290,6 +288,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
             );
         }
     }
-
     Ok(())
 }

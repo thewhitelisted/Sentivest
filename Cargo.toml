@@ -3,6 +3,17 @@ name = "sentivest"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+resolver="3"
+members=[
+    "fastxml",
+]
+
+[lib]
+name="fastxml"
+crate-type=["lib"]
+path="./fastxml/src/lib.rs"
+
 [dependencies]
 reqwest = { version="0.12.14", features=["blocking"] }
 scraper = "0.23.1"
