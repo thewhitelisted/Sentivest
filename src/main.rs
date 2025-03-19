@@ -27,8 +27,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // fetch comapnhy data
         let company_data = io::fetch_sec_filings(&cik).await?;
-        println!("Company data: {}", company_data);
+        let data = io::parse_json(&company_data);
         company_datas.push(company_data);
+        
+        println!("Company data: {:?}", data);
     }
     Ok(())
 }

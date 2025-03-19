@@ -110,3 +110,19 @@ async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Erro
 
     Ok(response)
 }
+
+pub fn parse_json(json: &serde_json::Value) -> Vec<u64> {
+    // extract revenue data from past 5 years to calculate growth rate
+    let mut last_year = 0;
+    let mut second_last_year = 0;
+    let mut revenue_data = Vec::new();
+    if let Some(data) = json.get("facts")
+        .and_then(|f| f.get("us-gaap"))
+        .and_then(|g| g.get("Revenues"))
+        .and_then(|r| r.get("units"))
+        .and_then(|u| u.get("USD")) {
+        //TODO
+    }
+    
+    revenue_data
+}
