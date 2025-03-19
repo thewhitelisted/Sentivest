@@ -56,18 +56,85 @@ async fn scrape_filing(url: &str) -> Result<String, Box<dyn Error>> {
         .await?
         .text()
         .await?;
-    let document = Html::parse_document(&response);
-
-    let selector = Selector::parse("p").unwrap(); // Selects paragraphs
+    
+    // First, look for <DOCUMENT> sections which contain the actual documents
     let mut extracted_text = String::new();
-
-    for element in document.select(&selector) {
-        let text = element.text().collect::<Vec<_>>().join(" ");
-        extracted_text.push_str(&text);
-        extracted_text.push_str("\n");
+    
+    // Find the 10-K document specifically (could be multiple documents in the filing)
+    if let Some(start_idx) = response.find("<TYPE>10-K") {
+        // Find the start of this document
+        if let Some(doc_start) = response[start_idx..].find("<TEXT>") {
+            let doc_start_idx = start_idx + doc_start + 6; // +6 to skip "<TEXT>"
+            
+            // Find the end of this document
+            if let Some(doc_end) = response[doc_start_idx..].find("</TEXT>") {
+                let doc_content = &response[doc_start_idx..(doc_start_idx + doc_end)];
+                
+                // Check if it's HTML content
+                if doc_content.contains("<html>") || doc_content.contains("<HTML>") {
+                    // Parse as HTML
+                    let document = Html::parse_document(doc_content);
+                    
+                    // Extract text from body
+                    if let Ok(body_selector) = Selector::parse("body") {
+                        for body in document.select(&body_selector) {
+                            for text_node in body.text() {
+                                let trimmed = text_node.trim();
+                                if !trimmed.is_empty() {
+                                    extracted_text.push_str(trimmed);
+                                    extracted_text.push_str("\n");
+                                }
+                            }
+                        }
+                    }
+                    
+                    // If body parsing failed, try to get text from all elements
+                    if extracted_text.trim().is_empty() {
+                        // Get text from various content elements
+                        for selector_str in ["p", "div", "td", "li", "span", "h1", "h2", "h3", "h4"] {
+                            if let Ok(selector) = Selector::parse(selector_str) {
+                                for element in document.select(&selector) {
+                                    for text_node in element.text() {
+                                        let trimmed = text_node.trim();
+                                        if !trimmed.is_empty() {
+                                            extracted_text.push_str(trimmed);
+                                            extracted_text.push_str("\n");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Treat as plain text - just return the document content
+                    extracted_text = doc_content.to_string();
+                }
+            }
+        }
     }
-
-    Ok(extracted_text)
+    
+    // If we couldn't extract anything meaningful using the methods above
+    if extracted_text.trim().is_empty() {
+        // Alternative approach: Look for the main document after the header section
+        if let Some(idx) = response.find("</SEC-HEADER>") {
+            extracted_text = response[idx + 13..].to_string(); // +13 to skip "</SEC-HEADER>"
+        }
+    }
+    
+    // Clean up the text (remove excessive whitespace, etc.)
+    let cleaned_text = extracted_text
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    
+    if cleaned_text.trim().is_empty() {
+        // Last resort: return a portion of the original response
+        Ok(response.chars().take(10000).collect())
+    } else {
+        Ok(cleaned_text)
+    }
 }
 
 /// Fetches the CIK for a given ticker symbol from a local JSON file
@@ -191,7 +258,15 @@ fn analyze_stock_data(history: &yahoo::YResponse) -> Result<String, Box<dyn Erro
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let tickers = vec!["TSLA", "GOOGL", "MSFT"];
+    let tickers = vec!["MSFT", "GOOGL", "TSLA"];
+    use std::fs;
+    use std::path::Path;
+    
+    // Create a directory to store the filings if it doesn't exist
+    let filings_dir = "sec_filings";
+    if !Path::new(filings_dir).exists() {
+        fs::create_dir(filings_dir)?;
+    }
 
     for ticker in &tickers {
         println!("\n=== Processing {} ===", ticker);
@@ -214,7 +289,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             // Scrape filing content
             let extracted_text = scrape_filing(filing_url).await?;
-            println!("Extracted SEC Filing Content:\n{}", &extracted_text[..1000]); // Print only first 1000 characters
+            
+            // Save the full content to a file
+            let file_path = format!("{}/{}_10K.txt", filings_dir, ticker);
+            fs::write(&file_path, &extracted_text)?;
+            println!("Saved full 10-K content ({} bytes) to {}", extracted_text.len(), file_path);
+            
+            // Print preview of content
+            println!("Extracted SEC Filing Content (preview):\n{}", 
+                &extracted_text.chars().take(1000).collect::<String>()); 
         }
     }
 
