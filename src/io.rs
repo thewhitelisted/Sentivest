@@ -111,18 +111,35 @@ async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Erro
     Ok(response)
 }
 
-pub fn parse_json(json: &serde_json::Value) -> Vec<u64> {
+pub fn parse_json(json: &serde_json::Value) -> Vec<f64> {
     // extract revenue data from past 5 years to calculate growth rate
-    let mut last_year = 0;
-    let mut second_last_year = 0;
+    let mut last_year = 0.0;
+    let mut second_last_year = 0.0;
     let mut revenue_data = Vec::new();
     if let Some(data) = json.get("facts")
         .and_then(|f| f.get("us-gaap"))
         .and_then(|g| g.get("Revenues"))
         .and_then(|r| r.get("units"))
         .and_then(|u| u.get("USD")) {
-        //TODO
+        let revenues = data.as_array().unwrap();
+        // filter all non-yearly reports
+        let yearly_reports = revenues
+            .iter()
+            .filter(|r| r.get("fp").unwrap().as_str().unwrap() == "FY");
+
+        // reports come in chronological order, get the last two indices
+        let mut reports = yearly_reports.collect::<Vec<_>>();
+        reports.reverse();
+        println!("Reports: {:?}", reports);
+        if reports.len() >= 2 {
+            last_year = reports[0].get("val").unwrap().as_f64().unwrap();
+            second_last_year = reports[1].get("val").unwrap().as_f64().unwrap();
+        } else {
+            println!("Not enough data to calculate growth rate");
+        }
     }
+    let growth_rate = ((last_year - second_last_year) / second_last_year) * 100.0;
     
+    revenue_data.push(growth_rate);
     revenue_data
 }
