@@ -5,6 +5,15 @@ use std::error::Error;
 use time::OffsetDateTime;
 use yahoo_finance_api as yahoo;
 
+/// Fetch SEC filings for a given CIK and form type
+/// 
+/// Example URL: 
+///     https://www.sec.gov/Archives/edgar/data/320193/000032019320000096/0000320193-20-000096.txt
+/// 
+/// The URL format is: 
+///     https://www.sec.gov/Archives/edgar/data/{CIK}/{AccessionNumber-no-dashes}/{AccessionNumber-with-dashes}.txt
+/// 
+/// Returns: a vector of URLs for the filings
 async fn fetch_sec_filings(cik: &str, form_type: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let url = format!("https://data.sec.gov/submissions/CIK{}.json", cik);
 
@@ -44,6 +53,14 @@ async fn fetch_sec_filings(cik: &str, form_type: &str) -> Result<Vec<String>, Bo
     Ok(filings_urls)
 }
 
+/// Scrape the content of an SEC filing
+/// 
+/// This function attempts to extract the main text content from an SEC filing URL.
+/// It first looks for the <DOCUMENT> section containing the actual document content.
+/// If that fails, it tries to extract the main document after the header section.
+/// If all else fails, it returns a portion of the original response.
+/// 
+/// Returns: the extracted text content as a string
 async fn scrape_filing(url: &str) -> Result<String, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let response = client
@@ -135,6 +152,12 @@ async fn scrape_filing(url: &str) -> Result<String, Box<dyn Error>> {
     }
 }
 
+/// Get the CIK (Central Index Key) for a given stock ticker
+/// 
+/// This function reads a local JSON file containing mappings of stock tickers to CIKs.
+/// The JSON file is based on the SEC's EDGAR company listings.
+/// 
+/// Returns: the CIK as a 10-digit string
 fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     // Read the embedded JSON file
     let json_data = include_str!("company_tickers.json");
@@ -165,6 +188,12 @@ fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     Err(format!("CIK not found for ticker: {}", ticker).into())
 }
 
+/// Get historical stock price data for a given ticker
+/// 
+/// This function uses the Yahoo Finance API to fetch historical stock price data.
+/// It retrieves the stock price data for the past `days` days.
+/// 
+/// Returns: a `YResponse` struct containing the historical price data
 #[allow(unused)]
 async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, Box<dyn Error>> {
     let provider = yahoo::YahooConnector::new()?;
@@ -189,6 +218,11 @@ async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, 
     Ok(response)
 }
 
+/// Get the latest stock quote for a given ticker
+/// 
+/// This function uses the Yahoo Finance API to fetch the latest stock quote for a given ticker.
+/// 
+/// Returns: a `YResponse` struct containing the latest quote data
 #[allow(unused)]
 async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Error>> {
     let provider = yahoo::YahooConnector::new()?;
