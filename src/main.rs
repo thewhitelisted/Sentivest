@@ -1,3 +1,4 @@
+// imports
 use yahoo_finance_api as yahoo;
 use std::error::Error;
 use serde_json;
@@ -137,7 +138,6 @@ async fn scrape_filing(url: &str) -> Result<String, Box<dyn Error>> {
     }
 }
 
-/// Fetches the CIK for a given ticker symbol from a local JSON file
 fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     // Read the embedded JSON file
     let json_data = include_str!("company_tickers.json");
@@ -168,7 +168,6 @@ fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     Err(format!("CIK not found for ticker: {}", ticker).into())
 }
 
-/// Gets historical stock data from Yahoo Finance API
 async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, Box<dyn Error>> {
     let provider = yahoo::YahooConnector::new()?;
     
@@ -177,11 +176,9 @@ async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, 
     
     println!("Fetching {} days of history for {}", days, ticker);
     
-    // Convert chrono DateTime to time OffsetDateTime
     let start_odt = OffsetDateTime::from_unix_timestamp(start.timestamp())?;
     let end_odt = OffsetDateTime::from_unix_timestamp(end.timestamp())?;
     
-    // Get quotes history
     let response = provider.get_quote_history(ticker, start_odt, end_odt).await?;
     
     // Ensure we have valid data
@@ -192,7 +189,6 @@ async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, 
     Ok(response)
 }
 
-/// Gets latest quote information
 async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Error>> {
     let provider = yahoo::YahooConnector::new()?;
     
@@ -204,7 +200,6 @@ async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Erro
     Ok(response)
 }
 
-/// A simple analysis of the stock data
 fn analyze_stock_data(history: &yahoo::YResponse) -> Result<String, Box<dyn Error>> {
     let quotes = history.quotes()?;
     
