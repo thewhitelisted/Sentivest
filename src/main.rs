@@ -253,6 +253,9 @@ fn analyze_stock_data(history: &yahoo::YResponse) -> Result<String, Box<dyn Erro
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // todo: add impl for user portfolios
+    // todo: from then filter any etfs or mutual funds before checking for sec filings
+    //       - after getting sec data we run sentiment analysis on everything
     let tickers = vec!["MSFT", "GOOGL", "TSLA"];
     use std::fs;
     use std::path::Path;
