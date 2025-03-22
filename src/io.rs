@@ -11,13 +11,7 @@ use regex::Regex;
 use rand::Rng;
 use tokio::time::sleep;
 
-/// Fetch SEC filings for a given CIK and form type
-///
-/// Example URL:
-///     https://www.sec.gov/Archives/edgar/data/320193/000032019320000096/0000320193-20-000096.txt
-///
-/// The URL format is:
-///     https://www.sec.gov/Archives/edgar/data/{CIK}/{AccessionNumber-no-dashes}/{AccessionNumber-with-dashes}.txt
+/// Fetch SEC filings for a given CIK
 ///
 /// Returns: a vector of URLs for the filings
 pub async fn fetch_sec_filings(cik: &str) -> Result<serde_json::Value, Box<dyn Error>> {
