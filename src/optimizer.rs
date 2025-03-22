@@ -61,7 +61,7 @@ pub fn sentiment_returns(sentiments: Vec<Vec<f64>>) -> Vec<f64> {
         let bad = sentiments[i][0];
         let neutral = sentiments[i][1];
         let good = sentiments[i][2];
-        let sentiment = good - bad;
+        let sentiment = (good - bad)/(good + bad + neutral);
         final_sentiments.push(sentiment);
     }
     final_sentiments

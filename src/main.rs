@@ -93,6 +93,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         agg_sentiments.push(agg_sentiment);
     }
 
-    println!("Aggregated sentiments: {:?}", agg_sentiments);
+    println!("done aggregating sentiments");
+
+    let returns = optimizer::sentiment_returns(agg_sentiments);
+    println!("Returns: {:?}", returns);
     Ok(())
 }
