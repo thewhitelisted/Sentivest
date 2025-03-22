@@ -10,6 +10,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let tickers = vec!["MSFT", "GOOGL", "TSLA"];
 
     let mut company_datas = Vec::new();
+    let mut articles: Vec<Vec<String>> = Vec::new();
 
     for ticker in &tickers {
         println!("\n=== Processing {} ===", ticker);
@@ -31,6 +32,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         company_datas.push(company_data);
 
         println!("Company data: {:?}", data);
+
+        // scrape news
+        let articles_data = io::scrape_news(ticker).await?;
+        articles.push(articles_data);
     }
+
+    println!("articles: {:?}", articles);
     Ok(())
 }

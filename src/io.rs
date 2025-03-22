@@ -1,9 +1,15 @@
 // imports
-use chrono::{Duration, Utc};
+use chrono::Utc;
+use chrono::Duration;
+use std::time::Duration as std_duration;
 use serde_json::Value as json;
 use std::error::Error;
 use time::OffsetDateTime;
 use yahoo_finance_api as yahoo;
+use scraper::{Html, Selector};
+use regex::Regex;
+use rand::Rng;
+use tokio::time::sleep;
 
 /// Fetch SEC filings for a given CIK and form type
 ///
@@ -219,4 +225,63 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
     }
 
     revenue_data
+}
+
+// NOT PERFECT, MIGHT SUPPLMENT WITH A PYTHON SCRIPT
+pub async fn scrape_news(ticker: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let search_url = format!("https://www.google.com/search?q={}+stock+news&tbm=nws", ticker);
+    
+    // Fetch search results
+    let search_response = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0")
+        .build()?
+        .get(&search_url)
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    let search_doc = Html::parse_document(&search_response);
+    
+    // Extracting URLs from Google's result page
+    let link_selector = Selector::parse("a")?;
+    let url_pattern = Regex::new(r"/url\?q=(https://[^&]+)&")?;  // Extract clean URLs
+
+    let mut article_texts = Vec::new();
+
+    for element in search_doc.select(&link_selector).filter_map(|el| el.value().attr("href")) {
+        if let Some(captures) = url_pattern.captures(element) {
+            let link = captures.get(1).unwrap().as_str();
+            random_delay().await;
+            let article_text = scrape_article_text(link).await.unwrap_or_else(|_| "Failed to scrape".to_string());
+            article_texts.push(article_text);
+        }
+        if article_texts.len() >= 5 {
+            break;
+        }
+    }
+    
+    Ok(article_texts)
+}
+
+// Function to scrape article content
+async fn scrape_article_text(url: &str) -> Result<String, Box<dyn Error>> {
+    let response = reqwest::get(url).await?.text().await?;
+    let document = Html::parse_document(&response);
+
+    // Extracts paragraph text
+    let article_selector = Selector::parse("p")?;  // Most articles have content inside <p> tags
+    
+    let text = document
+        .select(&article_selector)
+        .map(|el| el.text().collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n");
+    
+    Ok(text)
+}
+
+async fn random_delay() {
+    let delay = rand::rng().random_range(2..6); // 2-5 seconds
+    sleep(std_duration::from_secs(delay)).await;
 }
