@@ -3,6 +3,7 @@ use chrono::{Duration, Utc};
 use std::error::Error;
 use time::OffsetDateTime;
 use yahoo_finance_api as yahoo;
+use serde_json::Value as json;
 
 /// Fetch SEC filings for a given CIK and form type
 /// 
@@ -147,14 +148,67 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
         }
     }
     
-    let mut growth_rate = None;
     if last_year == 0.0 || second_last_year == 0.0 {
-        growth_rate = None;
+        revenue_data.push(None);
     } else {
-        growth_rate = Some(((last_year - second_last_year) / second_last_year) * 100.0);
+        revenue_data.push(Some(((last_year - second_last_year) / second_last_year) * 100.0));
     }
     
-    
-    revenue_data.push(growth_rate);
+    // find debt equity ratio
+    // term debt / total shareholders equity
+    // LongTermDebtNoncurrent and StockholdersEquity
+    let mut debt_equity = Vec::new();
+    let mut debt = 0.0;
+    let mut equity = 0.0;
+
+    if let Some(data) = json.get("facts")
+        .and_then(|f| f.get("us-gaap"))
+        .and_then(|g| g.get("LongTermDebtNoncurrent"))
+        .and_then(|d| d.get("units"))
+        .and_then(|u| u.get("USD")) {
+        let debts = data.as_array().unwrap();
+        let debt_reports = debts
+            .iter()
+            .filter(|r| *r.get("fp").unwrap() != json::Null)
+            .filter(|r| r.get("fp").unwrap().as_str().unwrap() == "FY");
+
+        // reports come in chronological order, get the last two indices
+        let mut reports = debt_reports.collect::<Vec<_>>();
+        reports.reverse();
+        if reports.len() >= 1 {
+            debt = reports[0].get("val").unwrap().as_f64().unwrap();
+            // push the last debt date
+            debt_equity.push(reports[0].get("end").unwrap().as_str().unwrap().to_string());
+        }
+    }
+
+    if let Some(data) = json.get("facts")
+        .and_then(|f| f.get("us-gaap"))
+        .and_then(|g| g.get("StockholdersEquity"))
+        .and_then(|d| d.get("units"))
+        .and_then(|u| u.get("USD")) {
+        let equitys = data.as_array().unwrap();
+        let equity_reports = equitys
+            .iter()
+            .filter(|r| *r.get("fp").unwrap() != json::Null)
+            .filter(|r| r.get("fp").unwrap().as_str().unwrap() == "FY");
+
+        // reports come in chronological order, get the last two indices
+        let mut reports = equity_reports.collect::<Vec<_>>();
+        reports.reverse();
+        if reports.len() >= 1 {
+            equity = reports[0].get("val").unwrap().as_f64().unwrap();
+            debt_equity.push(reports[0].get("end").unwrap().as_str().unwrap().to_string());
+        }
+    }
+
+    if debt_equity[0] != debt_equity[1] {
+        revenue_data.push(None);
+    } else {
+        println!("Debt: {}, Equity: {}", debt, equity);
+        println!("years: {:?} and {:?}", debt_equity[0], debt_equity[1]);
+        revenue_data.push(Some(debt / equity));
+    }
+
     revenue_data
 }
