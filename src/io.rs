@@ -1,18 +1,18 @@
 // imports
 use chrono::{Duration, Utc};
+use serde_json::Value as json;
 use std::error::Error;
 use time::OffsetDateTime;
 use yahoo_finance_api as yahoo;
-use serde_json::Value as json;
 
 /// Fetch SEC filings for a given CIK and form type
-/// 
-/// Example URL: 
+///
+/// Example URL:
 ///     https://www.sec.gov/Archives/edgar/data/320193/000032019320000096/0000320193-20-000096.txt
-/// 
-/// The URL format is: 
+///
+/// The URL format is:
 ///     https://www.sec.gov/Archives/edgar/data/{CIK}/{AccessionNumber-no-dashes}/{AccessionNumber-with-dashes}.txt
-/// 
+///
 /// Returns: a vector of URLs for the filings
 pub async fn fetch_sec_filings(cik: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let url = format!("https://data.sec.gov/api/xbrl/companyfacts/CIK{}.json", cik);
@@ -30,10 +30,10 @@ pub async fn fetch_sec_filings(cik: &str) -> Result<serde_json::Value, Box<dyn E
 }
 
 /// Get the CIK (Central Index Key) for a given stock ticker
-/// 
+///
 /// This function reads a local JSON file containing mappings of stock tickers to CIKs.
 /// The JSON file is based on the SEC's EDGAR company listings.
-/// 
+///
 /// Returns: the CIK as a 10-digit string
 pub fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     // Read the embedded JSON file
@@ -66,10 +66,10 @@ pub fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
 }
 
 /// Get historical stock price data for a given ticker
-/// 
+///
 /// This function uses the Yahoo Finance API to fetch historical stock price data.
 /// It retrieves the stock price data for the past `days` days.
-/// 
+///
 /// Returns: a `YResponse` struct containing the historical price data
 #[allow(unused)]
 async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, Box<dyn Error>> {
@@ -96,9 +96,9 @@ async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, 
 }
 
 /// Get the latest stock quote for a given ticker
-/// 
+///
 /// This function uses the Yahoo Finance API to fetch the latest stock quote for a given ticker.
-/// 
+///
 /// Returns: a `YResponse` struct containing the latest quote data
 #[allow(unused)]
 async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Error>> {
@@ -117,11 +117,13 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
     let mut last_year = 0.0;
     let mut second_last_year = 0.0;
     let mut revenue_data = Vec::new();
-    if let Some(data) = json.get("facts")
+    if let Some(data) = json
+        .get("facts")
         .and_then(|f| f.get("us-gaap"))
         .and_then(|g| g.get("Revenues"))
         .and_then(|r| r.get("units"))
-        .and_then(|u| u.get("USD")) {
+        .and_then(|u| u.get("USD"))
+    {
         let revenues = data.as_array().unwrap();
         // filter all non-yearly reports
         let yearly_reports = revenues
@@ -131,7 +133,7 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
         // reports come in chronological order, get the last two indices
         let mut reports = yearly_reports.collect::<Vec<_>>();
         reports.reverse();
-        if reports.len() >= 2{
+        if reports.len() >= 2 {
             // date should be later than 2021
             if let Some(date) = reports[0].get("end") {
                 if let Some(year) = date.as_str().unwrap().split("-").collect::<Vec<_>>().get(0) {
@@ -147,13 +149,15 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
             println!("Not enough data to calculate growth rate");
         }
     }
-    
+
     if last_year == 0.0 || second_last_year == 0.0 {
         revenue_data.push(None);
     } else {
-        revenue_data.push(Some(((last_year - second_last_year) / second_last_year) * 100.0));
+        revenue_data.push(Some(
+            ((last_year - second_last_year) / second_last_year) * 100.0,
+        ));
     }
-    
+
     // find debt equity ratio
     // term debt / total shareholders equity
     // LongTermDebtNoncurrent and StockholdersEquity
@@ -161,11 +165,13 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
     let mut debt = 0.0;
     let mut equity = 0.0;
 
-    if let Some(data) = json.get("facts")
+    if let Some(data) = json
+        .get("facts")
         .and_then(|f| f.get("us-gaap"))
         .and_then(|g| g.get("LongTermDebtNoncurrent"))
         .and_then(|d| d.get("units"))
-        .and_then(|u| u.get("USD")) {
+        .and_then(|u| u.get("USD"))
+    {
         let debts = data.as_array().unwrap();
         let debt_reports = debts
             .iter()
@@ -182,11 +188,13 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
         }
     }
 
-    if let Some(data) = json.get("facts")
+    if let Some(data) = json
+        .get("facts")
         .and_then(|f| f.get("us-gaap"))
         .and_then(|g| g.get("StockholdersEquity"))
         .and_then(|d| d.get("units"))
-        .and_then(|u| u.get("USD")) {
+        .and_then(|u| u.get("USD"))
+    {
         let equitys = data.as_array().unwrap();
         let equity_reports = equitys
             .iter()
