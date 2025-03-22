@@ -11,7 +11,7 @@ The tool combines Modern Portfolio Theory with the Black-Litterman model to opti
 NOTE: sentiment analysis for company data only works for tickers that reflect actual companies.
 
 ## TODOs
-- [ ] Implement sentiment analysis module
+- [x] Implement sentiment analysis module
 - [ ] Develop Black-Litterman model integration
 - [ ] Create portfolio optimization algorithm
 - [ ] Design user interface for portfolio management
