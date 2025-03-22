@@ -17,3 +17,8 @@ class FinBERTSentiment:
         
         # Convert probabilities to a list instead of a dictionary
         return probabilities[0].tolist()  # Returns [negative, neutral, positive] scores
+
+if __name__ == "__main__":
+    finbert = FinBERTSentiment()
+    text = "I love this! I love this so so so so soso sos so sos osos sosos much!!!!! I love everything so much~!!!!! I love this so much! WOWOWOWOWOWOWIE EPICCC I LOVE THIS SO MUCH"
+    print(finbert.analyze_sentiment(text))  # [0.0002, 0.0001, 0.9997]

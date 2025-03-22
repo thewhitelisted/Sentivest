@@ -4,6 +4,7 @@ use pyo3::types::PyList;
 use std::env;
 
 mod io;
+mod optimizer;
 
 fn analyze_sentiment(text: &str) -> PyResult<Vec<f64>> {
     unsafe {
@@ -33,7 +34,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // todo: add impl for user portfolios
     // todo: from then filter any etfs or mutual funds before checking for sec filings
     //       - after getting sec data we run sentiment analysis on everything
-    let tickers = vec!["MSFT", "GOOGL", "TSLA"];
+    let tickers = vec!["TSLA"];
 
     let mut company_datas = Vec::new();
     let mut articles: Vec<Vec<String>> = Vec::new();
@@ -56,22 +57,42 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // fetch comapnhy data
         let company_data = io::fetch_sec_filings(&cik).await?;
         let data = io::parse_json(&company_data);
-        company_datas.push(company_data);
+        company_datas.push(data);
 
-        println!("Company data: {:?}", data);
+        println!("Company data claimed");
 
         // scrape news
         let articles_data = io::scrape_news(ticker).await?;
         articles.push(articles_data.clone());
 
+        println!("Articles scraped");
+
         // analyze sentiment
         let mut sentiment_data = Vec::new();
         for article in &articles_data {
             let sentiment = analyze_sentiment(article)?;
+            println!("Sentiment done");
             sentiment_data.push(sentiment);
         }
         sentiments.push(sentiment_data);
+        println!("Sentiments analyzed");
     }
-    println!("sentiments: {:?}", sentiments);
+
+    let analyzed_financials = optimizer::analyze_fiancials(company_datas);
+    // add each sentiment in analyzed_financials to sentiments in each ticker
+    for (i, fin) in analyzed_financials.iter().enumerate() {
+        for data in fin {
+            sentiments[i].push(data.clone());
+        }
+    }
+
+    let mut agg_sentiments = Vec::new();
+
+    for sentiment in sentiments {
+        let agg_sentiment = optimizer::aggregate_sentiment(sentiment);
+        agg_sentiments.push(agg_sentiment);
+    }
+
+    println!("Aggregated sentiments: {:?}", agg_sentiments);
     Ok(())
 }

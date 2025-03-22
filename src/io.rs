@@ -1,15 +1,12 @@
 // imports
 use chrono::Utc;
 use chrono::Duration;
-use std::time::Duration as std_duration;
 use serde_json::Value as json;
 use std::error::Error;
 use time::OffsetDateTime;
 use yahoo_finance_api as yahoo;
 use scraper::{Html, Selector};
 use regex::Regex;
-use rand::Rng;
-use tokio::time::sleep;
 
 /// Fetch SEC filings for a given CIK
 ///
@@ -246,7 +243,6 @@ pub async fn scrape_news(ticker: &str) -> Result<Vec<String>, Box<dyn Error>> {
     for element in search_doc.select(&link_selector).filter_map(|el| el.value().attr("href")) {
         if let Some(captures) = url_pattern.captures(element) {
             let link = captures.get(1).unwrap().as_str();
-            random_delay().await;
             let article_text = scrape_article_text(link).await.unwrap_or_else(|_| "Failed to scrape".to_string());
             article_texts.push(article_text);
         }
@@ -273,9 +269,4 @@ async fn scrape_article_text(url: &str) -> Result<String, Box<dyn Error>> {
         .join("\n");
     
     Ok(text)
-}
-
-async fn random_delay() {
-    let delay = rand::rng().random_range(2..6); // 2-5 seconds
-    sleep(std_duration::from_secs(delay)).await;
 }
