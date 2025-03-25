@@ -5,107 +5,148 @@ use std::env;
 
 mod io;
 mod optimizer;
+mod litterman;
 
 fn analyze_sentiment(text: &str) -> PyResult<Vec<f64>> {
     unsafe {
         env::set_var("PYTHONPATH", "./src");
     }
+    
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
         let sentiment_module = PyModule::import(py, "finbert")?;
         let sentiment_class = sentiment_module.getattr("FinBERTSentiment")?.call0()?;
         let sentiment_result = sentiment_class.getattr("analyze_sentiment")?.call1((text,))?;
 
-        // Ensure we received a Python list
-        let sentiment_list = sentiment_result.downcast::<PyList>()?;
-
-        // Extract each float value manually
-        let rust_vec: Vec<f64> = sentiment_list
-            .iter()
-            .map(|item| item.extract::<f64>())
-            .collect::<PyResult<Vec<f64>>>()?;
-
-        Ok(rust_vec)
+        // Convert Python list to Rust Vec<f64>
+        sentiment_result.downcast::<PyList>()?.extract()
     })
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // todo: add impl for user portfolios
-    // todo: from then filter any etfs or mutual funds before checking for sec filings
-    //       - after getting sec data we run sentiment analysis on everything
-    let mut tickers = vec!["TSLA", "AAPL"];
+    let tickers = vec!["TSLA", "AAPL", "MSFT", "GOOGL", "AMZN"];
+    let mut company_datas = Vec::with_capacity(tickers.len());
+    let mut articles = Vec::with_capacity(tickers.len());
+    let mut sentiments = Vec::with_capacity(tickers.len());
+    let mut valid_tickers = Vec::with_capacity(tickers.len());
 
-    let mut company_datas = Vec::new();
-    let mut articles: Vec<Vec<String>> = Vec::new();
-    let mut sentiments: Vec<Vec<Vec<f64>>> = Vec::new();
-
+    // Process each ticker
     for ticker in &tickers {
         println!("\n=== Processing {} ===", ticker);
 
         // Get CIK from local JSON
         let cik = match io::get_cik(ticker) {
-            Ok(cik) => cik,
+            Ok(cik) => {
+                println!("CIK for {}: {}", ticker, cik);
+                cik
+            },
             Err(e) => {
                 println!("Error getting CIK for {}: {}", ticker, e);
                 continue;
             }
         };
 
-        println!("CIK for {}: {}", ticker, cik);
-
-        // fetch comapnhy data
-        let company_data = io::fetch_sec_filings(&cik).await?;
-        let data = io::parse_json(&company_data);
-        company_datas.push(data);
-
-        println!("Company data claimed");
-
-        // scrape news
-        let articles_data = io::scrape_news(ticker).await?;
-        articles.push(articles_data.clone());
-
-        println!("Articles scraped");
-
-        // analyze sentiment
-        let mut sentiment_data = Vec::new();
-        for article in &articles_data {
-            let sentiment = analyze_sentiment(article)?;
-            println!("Sentiment done");
-            sentiment_data.push(sentiment);
+        // Fetch company data
+        match io::fetch_sec_filings(&cik).await {
+            Ok(company_data) => {
+                company_datas.push(io::parse_json(&company_data));
+                println!("Company data claimed");
+                
+                // Scrape news articles
+                match io::scrape_news(ticker).await {
+                    Ok(articles_data) => {
+                        articles.push(articles_data.clone());
+                        println!("Articles scraped");
+                        
+                        // Analyze sentiment
+                        match articles_data
+                            .iter()
+                            .map(|article| {
+                                let sentiment = analyze_sentiment(article)?;
+                                println!("Sentiment done");
+                                Ok(sentiment)
+                            })
+                            .collect::<Result<Vec<Vec<f64>>, PyErr>>() {
+                                Ok(sentiment_data) => {
+                                    sentiments.push(sentiment_data);
+                                    println!("Sentiments analyzed");
+                                    valid_tickers.push(*ticker);
+                                },
+                                Err(e) => {
+                                    println!("Error analyzing sentiments: {:?}", e);
+                                }
+                            }
+                    },
+                    Err(e) => println!("Error scraping news: {}", e)
+                }
+            },
+            Err(e) => println!("Error fetching SEC filings: {}", e)
         }
-        sentiments.push(sentiment_data);
-        println!("Sentiments analyzed");
     }
 
+    // Analyze financial data and merge with sentiment data
     let analyzed_financials = optimizer::analyze_fiancials(company_datas);
-    // add each sentiment in analyzed_financials to sentiments in each ticker
     for (i, fin) in analyzed_financials.iter().enumerate() {
         for data in fin {
-            sentiments[i].push(data.clone());
+            if i < sentiments.len() {
+                sentiments[i].push(data.clone());
+            }
         }
     }
 
-    let mut agg_sentiments = Vec::new();
+    // Aggregate sentiments
+    let agg_sentiments: Vec<_> = sentiments
+        .into_iter()
+        .map(optimizer::aggregate_sentiment)
+        .collect();
+    println!("Done aggregating sentiments");
 
-    for sentiment in sentiments {
-        let agg_sentiment = optimizer::aggregate_sentiment(sentiment);
-        agg_sentiments.push(agg_sentiment);
-    }
-
-    println!("done aggregating sentiments");
-
+    // Calculate returns and sort
     let returns = optimizer::sentiment_returns(agg_sentiments);
-    // sort returns and keep track of order
-    let mut sorted_returns = returns.iter().enumerate().collect::<Vec<_>>();
-    sorted_returns.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
-    // sort tickers based on returns
-    tickers = sorted_returns.iter().map(|(i, _)| tickers[*i]).collect::<Vec<_>>();
+    
+    // Track ordering during sort for consistent indexing
+    let mut indexed_returns: Vec<(usize, &f64)> = returns.iter().enumerate().collect();
+    indexed_returns.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal));
+    
+    // Update tickers to match new ordering
+    let sorted_tickers: Vec<_> = indexed_returns
+        .iter()
+        .map(|(i, _)| valid_tickers[*i])
+        .collect();
 
-    // get only sorted values
-    let values = sorted_returns.iter().map(|(_, v)| **v).collect::<Vec<_>>();
-    let mut p_values = optimizer::get_pviews(values.clone());
-    let mut q_values = optimizer::get_qviews(values.clone());
+    // Extract sorted values
+    let values: Vec<f64> = indexed_returns
+        .iter()
+        .map(|(_, v)| **v)
+        .collect();
+                                        
+    // Generate views
+    let p_values = optimizer::get_pviews(values.clone());
+    let q_values = optimizer::get_qviews(values);
 
+    // Get market data
+    let market_weights = io::get_market_weights(sorted_tickers.clone()).await?;
+    let sigma = io::get_covariance_matrix(sorted_tickers.clone()).await?;
+    let omega = io::get_uncertainty_matrix(sorted_tickers.clone());
+
+    // Run Black-Litterman model
+    let tau = 0.025;
+    let posterior_mean = litterman::black_litterman(
+        &sigma, 
+        &market_weights, 
+        tau, 
+        &p_values, 
+        &q_values, 
+        &omega
+    );
+
+    println!("Posterior mean: {:?}", posterior_mean);
+
+    let updated_weights = litterman::mvo(&sigma, posterior_mean);
+    for i in 0..sorted_tickers.len() {
+        println!("{}: {:.2}%", sorted_tickers[i], updated_weights[i] * 100.0);
+    }
+    
     Ok(())
 }

@@ -1,107 +1,96 @@
 fn parse_growth_rate(data: Option<f64>) -> Vec<f64> {
-    if let Some(data) = data {
-        if data < 0.0 {
-            vec![0.2, 0.8, 0.0]
-        } else if data <= 0.1 && data >= 0.5 {
-            vec![0.0, 0.8, 0.2]
-        } else {
-            vec![0.0, 1.0, 0.0]
-        }
-    } else {
-        vec![0.0, 0.0, 0.0]
+    match data {
+        Some(value) if value < 0.0 => vec![0.2, 0.8, 0.0],
+        Some(value) if (0.0..=0.1).contains(&value) || value >= 0.5 => vec![0.0, 0.8, 0.2],
+        Some(_) => vec![0.0, 1.0, 0.0],
+        None => vec![0.0, 0.0, 0.0],
     }
 }
 
 fn parse_debt_equity(data: Option<f64>) -> Vec<f64> {
-    if let Some(data) = data {
-        if data < 1.0 {
-            vec![0.0, 1.0, 0.0]
-        } else if data >= 1.0 && data <= 1.5 {
-            vec![0.0, 0.8, 0.2]
-        } else {
-            vec![0.2, 0.8, 0.0]
-        }
-    } else {
-        vec![0.0, 0.0, 0.0]
+    match data {
+        Some(value) if (1.0..=1.5).contains(&value) => vec![0.0, 0.8, 0.2],
+        Some(value) if value < 1.0 => vec![0.0, 1.0, 0.0],
+        Some(_) => vec![0.2, 0.8, 0.0],
+        None => vec![0.0, 0.0, 0.0],
     }
 }
 
 pub fn analyze_fiancials(datas: Vec<Vec<Option<f64>>>) -> Vec<Vec<Vec<f64>>> {
-    let mut result = Vec::new();
-    for data in datas {
-        let growth_rate = data[0];
-        let debt_equity = data[1];
-        let growth_matrix = parse_growth_rate(growth_rate);
-        let debt_matrix = parse_debt_equity(debt_equity);
-        result.push(vec![growth_matrix, debt_matrix]);
-    }
-    result
+    datas.into_iter()
+        .map(|data| {
+            if data.len() < 2 {
+                return Vec::new();
+            }
+            vec![parse_growth_rate(data[0]), parse_debt_equity(data[1])]
+        })
+        .collect()
 }
 
 pub fn aggregate_sentiment(sentiments: Vec<Vec<f64>>) -> Vec<f64> {
-    // average sentiment for each article
-    let mut result = Vec::new();
-    let mut good = 0.0;
-    let mut neutral = 0.0;
-    let mut bad = 0.0;
-    for sentiment in &sentiments {
-        bad += sentiment[0];
-        neutral += sentiment[1];
-        good += sentiment[2];
+    if sentiments.is_empty() {
+        return Vec::new();
     }
-    result.push(bad / sentiments.len() as f64);
-    result.push(neutral / sentiments.len() as f64);
-    result.push(good / sentiments.len() as f64);
+    
+    let len = sentiments.len() as f64;
+    let mut result = vec![0.0; 3];
+    
+    for sentiment in sentiments {
+        if sentiment.len() >= 3 {
+            result[0] += sentiment[0];
+            result[1] += sentiment[1];
+            result[2] += sentiment[2];
+        }
+    }
+    
+    result.iter_mut().for_each(|val| *val /= len);
     result
 }
 
 pub fn sentiment_returns(sentiments: Vec<Vec<f64>>) -> Vec<f64> {
-    let mut final_sentiments = Vec::new();
-    for i in 0..sentiments.len() {
-        let bad = sentiments[i][0];
-        let neutral = sentiments[i][1];
-        let good = sentiments[i][2];
-        let sentiment = (good - bad)/(good + bad + neutral);
-        final_sentiments.push(sentiment);
-    }
-    final_sentiments
+    sentiments.iter()
+        .map(|sentiment| {
+            if sentiment.len() < 3 {
+                return 0.0;
+            }
+            let (bad, neutral, good) = (sentiment[0], sentiment[1], sentiment[2]);
+            let total = bad + neutral + good;
+            if total == 0.0 { 0.0 } else { (good - bad) / total }
+        })
+        .collect()
 }
 
 pub fn get_pviews(sentiment_returns: Vec<f64>) -> Vec<Vec<f64>> {
-    // get p values for each sentiment returns
-    // most positive sentiment return should outperform all other sentiment returns
-    // most negative sentiment return should underperform all other sentiment returns
-    let mut p_values = Vec::new();
-    for i in 0..sentiment_returns.len() {
-        let mut row = Vec::new();
-        for j in 0..sentiment_returns.len() {
-            if j < i || j - 1 == i{
-                row.push(0.0);
-            } else if j == i {
-                row.push(1.0);
-            } else {
-                row.push(-1.0);
-            } 
+    let len = sentiment_returns.len();
+    let mut p_values = Vec::with_capacity(len);
+    
+    for i in 0..len {
+        let mut row = vec![0.0; len];
+        row[i] = 1.0; // Set diagonal to 1.0
+        
+        // Set certain elements to -1.0 efficiently
+        for j in (i+2)..len {
+            row[j] = -1.0;
         }
+        
         p_values.push(row);
     }
-
+    
     p_values
 }
 
-pub fn get_qviews(sentiment_returns: Vec<f64>) -> Vec<Vec<f64>> {
-    // convert sentiment returns into % differences from the one to the left.
-    let mut q_values = Vec::new();
-    for i in 0..sentiment_returns.len() {
-        let mut row = Vec::new();
-        for j in 0..sentiment_returns.len() {
-            if j < i {
-                row.push(0.0);
-            } else {
-                row.push((sentiment_returns[j] - sentiment_returns[i]) / sentiment_returns[i]);
-            }
-        }
-        q_values.push(row);
+pub fn get_qviews(sentiment_returns: Vec<f64>) -> Vec<f64> {
+    if sentiment_returns.is_empty() {
+        return Vec::new();
     }
+    
+    let mut q_values = Vec::with_capacity(sentiment_returns.len());
+    q_values.push(sentiment_returns[0]);
+    
+    sentiment_returns.windows(2)
+        .for_each(|window| {
+            q_values.push(window[1] - window[0]);
+        });
+    
     q_values
 }

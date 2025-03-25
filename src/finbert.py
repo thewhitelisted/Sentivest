@@ -10,12 +10,19 @@ class FinBERTSentiment:
     def analyze_sentiment(self, text):
         if len(text) < 150:
             return [0.0, 0.0, 0.0]
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+        
+        # Truncate extremely long texts to prevent memory issues
+        max_length = 512
+        truncated_text = text[:50000] if len(text) > 50000 else text
+        
+        inputs = self.tokenizer(truncated_text, return_tensors="pt", truncation=True, padding=True, max_length=max_length)
+        
         with torch.no_grad():
             logits = self.model(**inputs).logits
+        
         probabilities = torch.nn.functional.softmax(logits, dim=-1)
         
-        # Convert probabilities to a list instead of a dictionary
+        # Convert probabilities to a list
         return probabilities[0].tolist()  # Returns [negative, neutral, positive] scores
 
 if __name__ == "__main__":
