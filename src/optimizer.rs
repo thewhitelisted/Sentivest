@@ -66,3 +66,42 @@ pub fn sentiment_returns(sentiments: Vec<Vec<f64>>) -> Vec<f64> {
     }
     final_sentiments
 }
+
+pub fn get_pviews(sentiment_returns: Vec<f64>) -> Vec<Vec<f64>> {
+    // get p values for each sentiment returns
+    // most positive sentiment return should outperform all other sentiment returns
+    // most negative sentiment return should underperform all other sentiment returns
+    let mut p_values = Vec::new();
+    for i in 0..sentiment_returns.len() {
+        let mut row = Vec::new();
+        for j in 0..sentiment_returns.len() {
+            if j < i || j - 1 == i{
+                row.push(0.0);
+            } else if j == i {
+                row.push(1.0);
+            } else {
+                row.push(-1.0);
+            } 
+        }
+        p_values.push(row);
+    }
+
+    p_values
+}
+
+pub fn get_qviews(sentiment_returns: Vec<f64>) -> Vec<Vec<f64>> {
+    // convert sentiment returns into % differences from the one to the left.
+    let mut q_values = Vec::new();
+    for i in 0..sentiment_returns.len() {
+        let mut row = Vec::new();
+        for j in 0..sentiment_returns.len() {
+            if j < i {
+                row.push(0.0);
+            } else {
+                row.push((sentiment_returns[j] - sentiment_returns[i]) / sentiment_returns[i]);
+            }
+        }
+        q_values.push(row);
+    }
+    q_values
+}

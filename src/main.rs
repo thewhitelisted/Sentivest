@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // todo: add impl for user portfolios
     // todo: from then filter any etfs or mutual funds before checking for sec filings
     //       - after getting sec data we run sentiment analysis on everything
-    let tickers = vec!["TSLA"];
+    let mut tickers = vec!["TSLA", "AAPL"];
 
     let mut company_datas = Vec::new();
     let mut articles: Vec<Vec<String>> = Vec::new();
@@ -96,6 +96,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("done aggregating sentiments");
 
     let returns = optimizer::sentiment_returns(agg_sentiments);
-    println!("Returns: {:?}", returns);
+    // sort returns and keep track of order
+    let mut sorted_returns = returns.iter().enumerate().collect::<Vec<_>>();
+    sorted_returns.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+    // sort tickers based on returns
+    tickers = sorted_returns.iter().map(|(i, _)| tickers[*i]).collect::<Vec<_>>();
+
+    // get only sorted values
+    let values = sorted_returns.iter().map(|(_, v)| **v).collect::<Vec<_>>();
+    let mut p_values = optimizer::get_pviews(values.clone());
+    let mut q_values = optimizer::get_qviews(values.clone());
+
     Ok(())
 }
