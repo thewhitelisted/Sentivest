@@ -7,12 +7,7 @@ use yahoo_finance_api as yahoo;
 use scraper::{Html, Selector};
 use regex::Regex;
 
-/// Get the CIK (Central Index Key) for a given stock ticker
-///
-/// This function reads a local JSON file containing mappings of stock tickers to CIKs.
-/// The JSON file is based on the SEC's EDGAR company listings.
-///
-/// Returns: the CIK as a 10-digit string
+// Get the CIK (Central Index Key) for a given stock ticker
 pub fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     // Read the embedded JSON file
     let json_data = include_str!("company_tickers.json");
@@ -42,9 +37,7 @@ pub fn get_cik(ticker: &str) -> Result<String, Box<dyn Error>> {
     Err(format!("CIK not found for ticker: {}", ticker).into())
 }
 
-/// Fetch SEC filings for a given CIK
-///
-/// Returns: a vector of URLs for the filings
+// Fetch SEC filings for a given CIK
 pub async fn fetch_sec_filings(cik: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let url = format!("https://data.sec.gov/api/xbrl/companyfacts/CIK{}.json", cik);
 
@@ -60,13 +53,7 @@ pub async fn fetch_sec_filings(cik: &str) -> Result<serde_json::Value, Box<dyn E
     serde_json::from_str(&response).map_err(|e| e.into())
 }
 
-/// Get historical stock price data for a given ticker
-///
-/// This function uses the Yahoo Finance API to fetch historical stock price data.
-/// It retrieves the stock price data for the past `days` days.
-///
-/// Returns: a `YResponse` struct containing the historical price data
-#[allow(unused)]
+// Get historical stock price data for a given ticker
 async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, Box<dyn Error>> {
     let provider = yahoo::YahooConnector::new()?;
 
@@ -90,19 +77,14 @@ async fn get_stock_history(ticker: &str, days: i64) -> Result<yahoo::YResponse, 
     Ok(response)
 }
 
-/// Get the latest stock quote for a given ticker
-///
-/// This function uses the Yahoo Finance API to fetch the latest stock quote for a given ticker.
-///
-/// Returns: a `YResponse` struct containing the latest quote data
-#[allow(unused)]
+// Get the latest stock quote for a given ticker
 async fn get_latest_quote(ticker: &str) -> Result<yahoo::YResponse, Box<dyn Error>> {
     let provider = yahoo::YahooConnector::new()?;
     println!("Fetching latest quote for {}", ticker);
     provider.get_latest_quotes(ticker, "1d").await.map_err(|e| e.into())
 }
 
-/// Parse JSON from SEC filings to extract financial data
+// Parse JSON from SEC filings to extract financial data
 pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
     let mut revenue_data = Vec::with_capacity(2);
     let mut debt_equity = Vec::with_capacity(2);
@@ -223,7 +205,7 @@ pub fn parse_json(json: &serde_json::Value) -> Vec<Option<f64>> {
     revenue_data
 }
 
-/// Scrape news articles about a stock
+// Scrape news articles about a stock
 pub async fn scrape_news(ticker: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let search_url = format!("https://www.google.com/search?q={}+stock+news&tbm=nws", ticker);
     
@@ -276,7 +258,7 @@ pub async fn scrape_news(ticker: &str) -> Result<Vec<String>, Box<dyn Error>> {
     Ok(article_texts)
 }
 
-/// Scrape the text content from an article
+// Scrape the text content from an article
 async fn scrape_article_text(url: &str) -> Result<String, Box<dyn Error>> {
     let response = reqwest::get(url).await?.text().await?;
     let document = Html::parse_document(&response);
@@ -294,7 +276,7 @@ async fn scrape_article_text(url: &str) -> Result<String, Box<dyn Error>> {
     Ok(text)
 }
 
-/// Get market weights for a list of tickers
+// Get market weights for a list of tickers
 pub async fn get_market_weights(tickers: Vec<&str>) -> Result<Vec<f64>, Box<dyn Error>> {
     let mut market_weights = Vec::with_capacity(tickers.len());
     
@@ -323,7 +305,7 @@ pub async fn get_market_weights(tickers: Vec<&str>) -> Result<Vec<f64>, Box<dyn 
     Ok(market_weights)
 }
 
-/// Get covariance matrix for a list of tickers
+// Get covariance matrix for a list of tickers
 pub async fn get_covariance_matrix(tickers: Vec<&str>) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
     let n = tickers.len();
     let mut prices = Vec::with_capacity(n);
@@ -365,7 +347,7 @@ pub async fn get_covariance_matrix(tickers: Vec<&str>) -> Result<Vec<Vec<f64>>, 
     Ok(covariance_matrix)
 }
 
-/// Create an uncertainty matrix for a list of tickers
+// Create an uncertainty matrix for a list of tickers
 pub fn get_uncertainty_matrix(tickers: Vec<&str>) -> Vec<Vec<f64>> {
     let n = tickers.len();
     let mut uncertainty_matrix = vec![vec![0.0; n]; n];

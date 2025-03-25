@@ -1,4 +1,4 @@
-/// Matrix multiplication with improved performance and error handling
+// Matrix multiplication
 fn mat_mult(a: &[Vec<f64>], b: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     // Handle empty matrices
     if a.is_empty() || b.is_empty() || a[0].is_empty() || b[0].is_empty() {
@@ -33,7 +33,7 @@ fn mat_mult(a: &[Vec<f64>], b: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     Some(result)
 }
 
-/// Transpose a matrix with improved memory allocation
+// Transpose a matrix
 fn transpose(mat: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     // Handle empty matrix
     if mat.is_empty() || mat[0].is_empty() {
@@ -63,7 +63,7 @@ fn transpose(mat: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     Some(transposed)
 }
 
-/// Identity matrix generator with better type signature
+// Identity matrix generator
 fn identity_matrix(size: usize) -> Vec<Vec<f64>> {
     let mut identity = vec![vec![0.0; size]; size];
     for i in 0..size {
@@ -72,7 +72,7 @@ fn identity_matrix(size: usize) -> Vec<Vec<f64>> {
     identity
 }
 
-/// Invert a matrix using Gaussian elimination with improved stability
+// Invert a matrix using Gaussian elimination
 fn invert_matrix(matrix: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     // Handle empty matrix
     if matrix.is_empty() || matrix[0].is_empty() {
@@ -158,12 +158,11 @@ fn invert_matrix(matrix: &[Vec<f64>]) -> Option<Vec<Vec<f64>>> {
     Some(inv)
 }
 
-/// Create a column vector from a regular vector
 fn to_column_vector(vec: &[f64]) -> Vec<Vec<f64>> {
     vec.iter().map(|&x| vec![x]).collect()
 }
 
-/// Black-Litterman Model Implementation with improved robustness
+// Black-Litterman Model Implementation
 pub fn black_litterman(
     sigma: &[Vec<f64>], // Covariance matrix (Σ)
     market_weights: &[f64], // Market capitalization weights (w_m)
@@ -313,7 +312,7 @@ pub fn black_litterman(
     posterior_mean
 }
 
-/// Mean-variance optimization for portfolio allocation
+// Mean-variance optimization for portfolio allocation
 pub fn mvo(cov: &[Vec<f64>], arv: Vec<f64>) -> Vec<f64> {
     // Check if inputs are valid and have compatible dimensions
     if cov.is_empty() || arv.is_empty() {
