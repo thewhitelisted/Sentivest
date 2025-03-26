@@ -14,3 +14,4 @@ NOTE: sentiment analysis for company data only works for tickers that reflect ac
 - [x] Implement sentiment analysis module
 - [x] Develop Black-Litterman model integration
 - [x] Create portfolio optimization algorithm
+- [ ] remove shorting LMAO
